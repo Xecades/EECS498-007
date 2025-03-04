@@ -2,3 +2,4 @@ __pycache__
 *.local.*
 .DS_Store
 cifar-10-batches-py
+*.pt
