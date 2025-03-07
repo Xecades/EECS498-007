@@ -947,11 +947,14 @@ class BatchNorm(object):
         # single 80-character line.                                       #
         ###################################################################
         # Replace "pass" statement with your code
-        raise NotImplementedError("Skipped BatchNorm backward_alt")
-        #################################################################
+        x, x_hat, mu, var, gamma, beta, eps = cache
+        N = x.shape[0]
+        dbeta = dout.sum(dim=0)
+        dgamma = (dout * x_hat).sum(dim=0)
+        dx = gamma / torch.sqrt(var + eps) * (dout - (dbeta + x_hat * dgamma) / N)
+        ###################################################################
         #                        END OF YOUR CODE                       #
-        #################################################################
-
+        ###################################################################
         return dx, dgamma, dbeta
 
 
