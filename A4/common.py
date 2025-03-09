@@ -59,7 +59,8 @@ class DetectorBackboneWithFPN(nn.Module):
         # batches of tensors in NCHW format, that give intermediate features
         # from the backbone network.
         dummy_out = self.backbone(torch.randn(2, 3, 224, 224))
-        dummy_out_shapes = [(key, value.shape) for key, value in dummy_out.items()]
+        dummy_out_shapes = [(key, value.shape)
+                            for key, value in dummy_out.items()]
 
         print("For dummy input images with shape: (2, 3, 224, 224)")
         for level_name, feature_shape in dummy_out_shapes:
@@ -221,7 +222,8 @@ def class_spec_nms(
     if boxes.numel() == 0:
         return torch.empty((0,), dtype=torch.int64, device=boxes.device)
     max_coordinate = boxes.max()
-    offsets = class_ids.to(boxes) * (max_coordinate + torch.tensor(1).to(boxes))
+    offsets = class_ids.to(boxes) * (max_coordinate +
+                                     torch.tensor(1).to(boxes))
     boxes_for_nms = boxes + offsets[:, None]
     keep = nms(boxes_for_nms, scores, iou_threshold)
     return keep
