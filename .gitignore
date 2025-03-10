@@ -4,3 +4,5 @@ __pycache__
 cifar-10-batches-py
 *.pt
 *.pth
+A4/VOCdevkit
+A4/*.json

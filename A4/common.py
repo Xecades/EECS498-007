@@ -85,7 +85,15 @@ class DetectorBackboneWithFPN(nn.Module):
         self.fpn_params = nn.ModuleDict()
 
         # Replace "pass" statement with your code
-        pass
+        for lv, shape in dummy_out_shapes:
+            channel = shape[1]
+            lateral = nn.Conv2d(channel, self.out_channels,
+                                kernel_size=1, stride=1, padding=0)
+            output = nn.Conv2d(self.out_channels, self.out_channels,
+                               kernel_size=3, stride=1, padding=1)
+
+            self.fpn_params[f"lateral_{lv}"] = lateral
+            self.fpn_params[f"output_{lv}"] = output
         ######################################################################
         #                            END OF YOUR CODE                        #
         ######################################################################
@@ -112,7 +120,15 @@ class DetectorBackboneWithFPN(nn.Module):
         ######################################################################
 
         # Replace "pass" statement with your code
-        pass
+        c3, c4, c5 = backbone_feats["c3"], backbone_feats["c4"], backbone_feats["c5"]
+        p5 = self.fpn_params["output_c5"](self.fpn_params["lateral_c5"](c5))
+        p4 = self.fpn_params["output_c4"](self.fpn_params["lateral_c4"](c4))
+        p3 = self.fpn_params["output_c3"](self.fpn_params["lateral_c3"](c3))
+        p4 += F.interpolate(p5, scale_factor=2, mode="bicubic")
+        p3 += F.interpolate(p4, scale_factor=2, mode="bicubic")
+        fpn_feats["p3"] = p3
+        fpn_feats["p4"] = p4
+        fpn_feats["p5"] = p5
         ######################################################################
         #                            END OF YOUR CODE                        #
         ######################################################################
@@ -158,7 +174,13 @@ def get_fpn_location_coords(
         # TODO: Implement logic to get location co-ordinates below.          #
         ######################################################################
         # Replace "pass" statement with your code
-        pass
+        # Maybe use torch.meshgrid?
+        _, _, H, W = feat_shape
+        y = torch.arange(H, dtype=dtype, device=device).view(H, 1).expand(H, W)
+        x = torch.arange(W, dtype=dtype, device=device).view(1, W).expand(H, W)
+        xc = ((x + 0.5) * level_stride).flatten()
+        yc = ((y + 0.5) * level_stride).flatten()
+        location_coords[level_name] = torch.stack((xc, yc), dim=1)
         ######################################################################
         #                             END OF YOUR CODE                       #
         ######################################################################
@@ -197,7 +219,40 @@ def nms(boxes: torch.Tensor, scores: torch.Tensor, iou_threshold: float = 0.5):
     # github.com/pytorch/vision/blob/main/torchvision/csrc/ops/cpu/nms_kernel.cpp
     #############################################################################
     # Replace "pass" statement with your code
-    pass
+
+    def IoU(b1, b2):
+        x1a, y1a, x2a, y2a = b1
+        x1b, y1b, x2b, y2b = b2
+
+        area_a = (x2a - x1a) * (y2a - y1a)
+        area_b = (x2b - x1b) * (y2b - y1b)
+
+        int_x = max(0, min(x2a, x2b) - max(x1a, x1b))
+        int_y = max(0, min(y2a, y2b) - max(y1a, y1b))
+        intersect = int_x * int_y
+        union = area_a + area_b - intersect
+
+        return intersect / union
+
+    scores, idx = scores.sort(descending=True)
+    boxes = boxes[idx]
+
+    scores = scores.tolist()
+    boxes = boxes.tolist()
+
+    keep = []
+    discard = [0 for _ in range(len(scores))]
+    for i in range(len(scores)):
+        if discard[i]:
+            continue
+        keep.append(idx[i])
+        for j in range(len(scores)):
+            if discard[j] or i == j:
+                continue
+            iou = IoU(boxes[i], boxes[j])
+            if iou > iou_threshold:
+                discard[j] = 1
+    keep = torch.tensor(keep, dtype=torch.long)
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
