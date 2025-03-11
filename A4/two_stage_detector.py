@@ -373,8 +373,10 @@ def sample_rpn_training(
     num_bg = num_samples - num_fg
 
     # Randomly select positive and negative examples.
-    perm1 = torch.randperm(foreground.numel(), device=foreground.device)[:num_fg]
-    perm2 = torch.randperm(background.numel(), device=background.device)[:num_bg]
+    perm1 = torch.randperm(
+        foreground.numel(), device=foreground.device)[:num_fg]
+    perm2 = torch.randperm(
+        background.numel(), device=background.device)[:num_bg]
 
     fg_idx = foreground[perm1]
     bg_idx = background[perm2]
@@ -516,8 +518,10 @@ class RPN(nn.Module):
         # Get image height and width according to feature sizes and strides.
         # We need these to clamp proposals (These should be (224, 224) but we
         # avoid hard-coding them).
-        img_h = feats_per_fpn_level["p3"].shape[2] * strides_per_fpn_level["p3"]
-        img_w = feats_per_fpn_level["p3"].shape[3] * strides_per_fpn_level["p3"]
+        img_h = feats_per_fpn_level["p3"].shape[2] * \
+            strides_per_fpn_level["p3"]
+        img_w = feats_per_fpn_level["p3"].shape[3] * \
+            strides_per_fpn_level["p3"]
 
         # STUDENT: Implement this method before moving forward with the rest
         # of this `forward` method.
@@ -538,7 +542,8 @@ class RPN(nn.Module):
         ######################################################################
         # Combine anchor boxes from all FPN levels - we do not need any
         # distinction of boxes across different levels (for training).
-        anchor_boxes = self._cat_across_fpn_levels(anchors_per_fpn_level, dim=0)
+        anchor_boxes = self._cat_across_fpn_levels(
+            anchors_per_fpn_level, dim=0)
 
         # Get matched GT boxes (list of B tensors, each of shape `(H*W*A, 5)`
         # giving matching GT boxes to anchor boxes). Fill this list:
@@ -908,7 +913,8 @@ class FasterRCNN(nn.Module):
         # RPN proposals by predicting box regression deltas.
 
         # Use `[0]` to remove the batch dimension.
-        proposals = {level_name: prop[0] for level_name, prop in proposals.items()}
+        proposals = {level_name: prop[0]
+                     for level_name, prop in proposals.items()}
         pred_boxes = self._cat_across_fpn_levels(proposals, dim=0)
 
         ######################################################################
