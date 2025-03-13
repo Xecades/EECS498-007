@@ -126,7 +126,6 @@ def scaled_dot_product_two_loop_single(
 def scaled_dot_product_two_loop_batch(
     query: Tensor, key: Tensor, value: Tensor
 ) -> Tensor:
-
     """
     The function performs a fundamental block for attention mechanism, the scaled
     dot product. We map the input query, key, and value to the output. Follow the
@@ -276,7 +275,6 @@ class SelfAttention(nn.Module):
     def forward(
         self, query: Tensor, key: Tensor, value: Tensor, mask: Tensor = None
     ) -> Tensor:
-
         """
         An implementation of the forward pass of the self-attention layer.
 
@@ -362,7 +360,6 @@ class MultiHeadAttention(nn.Module):
     def forward(
         self, query: Tensor, key: Tensor, value: Tensor, mask: Tensor = None
     ) -> Tensor:
-
         """
         An implementation of the forward pass of the MultiHeadAttention layer.
 
@@ -458,7 +455,7 @@ class LayerNormalization(nn.Module):
         # TODO: Implement the forward pass of the LayerNormalization layer.      #
         # Compute the mean and standard deviation of input and use these to      #
         # normalize the input. Further, use self.gamma and self.beta to scale    #
-        # these and shift this normalized input. Don't use torch.std to compute  # 
+        # these and shift this normalized input. Don't use torch.std to compute  #
         # the standard deviation.                                                #
         ##########################################################################
         # Replace "pass" statement with your code
@@ -603,7 +600,6 @@ class EncoderBlock(nn.Module):
         ##########################################################################
 
     def forward(self, x):
-
         """
 
         An implementation of the forward pass of the EncoderBlock of the
@@ -749,7 +745,6 @@ class DecoderBlock(nn.Module):
     def forward(
         self, dec_inp: Tensor, enc_inp: Tensor, mask: Tensor = None
     ) -> Tensor:
-
         """
         args:
             dec_inp: a Tensor of shape (N, K, M)
@@ -893,7 +888,6 @@ def position_encoding_simple(K: int, M: int) -> Tensor:
 
 
 def position_encoding_sinusoid(K: int, M: int) -> Tensor:
-
     """
     An implementation of the sinousoidal positional encodings.
 
@@ -982,7 +976,6 @@ class Transformer(nn.Module):
     def forward(
         self, ques_b: Tensor, ques_pos: Tensor, ans_b: Tensor, ans_pos: Tensor
     ) -> Tensor:
-
         """
 
         An implementation of the forward pass of the Transformer.
@@ -1035,7 +1028,6 @@ class AddSubDataset(torch.utils.data.Dataset):
         emb_dim,
         pos_encode,
     ):
-
         """
         The class implements the dataloader that will be used for the toy dataset.
 
