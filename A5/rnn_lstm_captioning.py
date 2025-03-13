@@ -461,11 +461,17 @@ class CaptioningRNN(nn.Module):
         self.word_embedding = WordEmbedding(vocab_size, wordvec_dim)
         self.output_proj = nn.Linear(hidden_dim, vocab_size)
 
+        C = self.image_encoder.out_channels
+
         if cell_type == "rnn":
             self.rnn = RNN(wordvec_dim, hidden_dim)
             self.feat_proj = nn.Linear(input_dim, hidden_dim)
-        else:
-            raise NotImplementedError()
+        elif cell_type == "lstm":
+            self.lstm = LSTM(wordvec_dim, hidden_dim)
+            self.feat_proj = nn.Linear(input_dim, hidden_dim)
+        else:  # attn
+            self.attn = AttentionLSTM(wordvec_dim, hidden_dim)
+            self.feat_proj = nn.Conv2d(C, hidden_dim, kernel_size=1)
         ######################################################################
         #                            END OF YOUR CODE                        #
         ######################################################################
@@ -534,11 +540,13 @@ class CaptioningRNN(nn.Module):
         wordvecs = self.word_embedding(captions_in)
 
         # 3.
+        # (N, T, H)
         if self.cell_type == "rnn":
-            # (N, T, H)
             hs = self.rnn(wordvecs, h0)
-        else:
-            raise NotImplementedError()
+        elif self.cell_type == "lstm":
+            hs = self.lstm(wordvecs, h0)
+        else:  # attn
+            hs = self.attn(wordvecs, h0)
 
         # 4.
         # (N, T, V)
@@ -619,8 +627,28 @@ class CaptioningRNN(nn.Module):
                 ht = self.rnn.step_forward(wordvecs, ht)
                 scores = self.output_proj(ht)
                 captions[:, t + 1] = scores.argmax(dim=1)
-        else:
-            raise NotImplementedError()
+        elif self.cell_type == "lstm":
+            feats = feats.view(N, C, -1).mean(dim=-1)
+            ht = self.feat_proj(feats)
+            ct = torch.zeros_like(ht)
+            captions[:, 0] = self._start
+            for t in range(max_length - 1):
+                wordvecs = self.word_embedding(captions[:, t])
+                ht, ct = self.lstm.step_forward(wordvecs, ht, ct)
+                scores = self.output_proj(ht)
+                captions[:, t + 1] = scores.argmax(dim=1)
+        else:  # attn
+            A = self.feat_proj(feats)
+            ht = A.mean(dim=(2, 3))
+            ct = ht.clone()
+            captions[:, 0] = self._start
+            for t in range(max_length - 1):
+                attn, Wattn = dot_product_attention(ht, A)
+                wordvecs = self.word_embedding(captions[:, t])
+                ht, ct = self.attn.step_forward(wordvecs, ht, ct, attn)
+                scores = self.output_proj(ht)
+                captions[:, t + 1] = scores.argmax(dim=1)
+                attn_weights_all[:, t + 1, :, :] = Wattn
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -681,7 +709,15 @@ class LSTM(nn.Module):
         ######################################################################
         next_h, next_c = None, None
         # Replace "pass" statement with your code
-        pass
+        H = prev_h.shape[1]
+        A = x @ self.Wx + prev_h @ self.Wh + self.b  # (N, 4H)
+        Ai = torch.sigmoid(A[:, :H])
+        Af = torch.sigmoid(A[:, H: 2*H])
+        Ao = torch.sigmoid(A[:, 2*H: 3*H])
+        Ag = torch.tanh(A[:, 3*H:])
+
+        next_c = Af * prev_c + Ai * Ag
+        next_h = Ao * torch.tanh(next_c)
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -715,7 +751,13 @@ class LSTM(nn.Module):
         ######################################################################
         hn = None
         # Replace "pass" statement with your code
-        pass
+        T = x.shape[1]
+        hn = []
+        ht, ct = h0, c0
+        for t in range(T):
+            ht, ct = self.step_forward(x[:, t, :], ht, ct)
+            hn.append(ht)
+        hn = torch.stack(hn, dim=1)
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -746,7 +788,13 @@ def dot_product_attention(prev_h, A):
     # functions. HINT: Make sure you reshape attn_weights back to (N, 4, 4)! #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    A = A.view(N, H, 16)
+    # (N, 1, H) @ (N, H, 16) -> (N, 1, 16) -> (N, 16)
+    E = (prev_h.unsqueeze(1) @ A / math.sqrt(H)).squeeze(1)
+    attn_weights = torch.softmax(E, dim=1)  # (N, 16)
+    # (N, H, 16) @ (N, 16, 1) -> (N, H, 1) -> (N, h)
+    attn = (A @ attn_weights.unsqueeze(2)).squeeze(2)
+    attn_weights = attn_weights.view(N, D_a, D_a)
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -810,7 +858,16 @@ class AttentionLSTM(nn.Module):
         #######################################################################
         next_h, next_c = None, None
         # Replace "pass" statement with your code
-        pass
+        H = prev_h.shape[1]
+        A = x @ self.Wx + prev_h @ self.Wh + \
+            attn @ self.Wattn + self.b  # (N, 4H)
+        Ai = torch.sigmoid(A[:, :H])
+        Af = torch.sigmoid(A[:, H: 2*H])
+        Ao = torch.sigmoid(A[:, 2*H: 3*H])
+        Ag = torch.tanh(A[:, 3*H:])
+
+        next_c = Af * prev_c + Ai * Ag
+        next_h = Ao * torch.tanh(next_c)
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -853,7 +910,14 @@ class AttentionLSTM(nn.Module):
         ######################################################################
         hn = None
         # Replace "pass" statement with your code
-        pass
+        T = x.shape[1]
+        hn = []
+        ht, ct = h0, c0
+        for t in range(T):
+            attn, _ = dot_product_attention(ht, A)
+            ht, ct = self.step_forward(x[:, t, :], ht, ct, attn)
+            hn.append(ht)
+        hn = torch.stack(hn, dim=1)
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
