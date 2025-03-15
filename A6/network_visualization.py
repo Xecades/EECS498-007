@@ -5,6 +5,7 @@ on the same device as input tensors
 """
 
 import torch
+import torch.nn.functional as F
 
 
 def hello():
@@ -41,7 +42,10 @@ def compute_saliency_maps(X, y, model):
     # Hint: X.grad.data stores the gradients                                     #
     ##############################################################################
     # Replace "pass" statement with your code
-    pass
+    scores = model(X)
+    loss = F.cross_entropy(scores, y, reduction="sum")
+    loss.backward()
+    saliency = X.grad.data.abs().max(dim=1)[0]
     ##############################################################################
     #               END OF YOUR CODE                                             #
     ##############################################################################
@@ -84,7 +88,22 @@ def make_adversarial_attack(X, target_y, model, max_iter=100, verbose=True):
     # You can print your progress over iterations to check your algorithm.       #
     ##############################################################################
     # Replace "pass" statement with your code
-    pass
+    for i in range(max_iter):
+        scores = model(X_adv)
+        score = scores[0, target_y]
+        score.backward()
+
+        g = X_adv.grad.data
+        g /= g.norm()
+
+        X_adv.data += learning_rate * g
+        X_adv.grad.data.zero_()
+
+        if verbose:
+            print(
+                "Iteration %d: target score %.3f, max score %.3f"
+                % (i, score.item(), scores.max().item())
+            )
     ##############################################################################
     #                             END OF YOUR CODE                               #
     ##############################################################################
@@ -119,7 +138,15 @@ def class_visualization_step(img, target_y, model, **kwargs):
     # after each step.                                                     #
     ########################################################################
     # Replace "pass" statement with your code
-    pass
+    img.requires_grad_()
+    scores = model(img)
+    score = scores[0, target_y]
+    score.backward()
+    g = img.grad.data
+    g /= g.norm()
+    img.data += learning_rate * g
+    img.data -= l2_reg * img.data
+    img.grad.data.zero_()
     ########################################################################
     #                             END OF YOUR CODE                         #
     ########################################################################
